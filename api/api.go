@@ -31,7 +31,7 @@ func createTweet(twitter TwitterService) http.HandlerFunc {
 		var t models.Tweet
 		err := json.NewDecoder(r.Body).Decode(&t)
 		if err != nil {
-			handleError(err, w, r)
+			handleError(models.ErrInvalidWithCause("failed to parse request body", err), w, r)
 			return
 		}
 
@@ -56,7 +56,7 @@ func listTweets(twitter TwitterService) http.HandlerFunc {
 		if r.URL.Query().Has("offset") {
 			o, err := strconv.Atoi(r.URL.Query().Get("offset"))
 			if err != nil {
-				handleError(err, w, r)
+				handleError(models.ErrInvalidWithCause("`offset` must be an integer value", err), w, r)
 				return
 			}
 			offset = o
@@ -65,7 +65,7 @@ func listTweets(twitter TwitterService) http.HandlerFunc {
 		if r.URL.Query().Has("limit") {
 			l, err := strconv.Atoi(r.URL.Query().Get("limit"))
 			if err != nil {
-				handleError(err, w, r)
+				handleError(models.ErrInvalidWithCause("`limit` must be an integer value", err), w, r)
 				return
 			}
 			limit = l
@@ -82,24 +82,23 @@ func listTweets(twitter TwitterService) http.HandlerFunc {
 }
 
 func handleError(err error, w http.ResponseWriter, r *http.Request) {
-	var (
-		statusCode int
-		response   interface{}
-	)
-
-	switch err {
-	// Todo(frode): Handle more error codes
-	default:
-		statusCode = http.StatusInternalServerError
-		response = map[string]string{"message": "Internal server error"}
+	statusCode := http.StatusInternalServerError
+	if e, ok := err.(models.Error); ok {
+		switch e.Kind {
+		case models.ErrKindMissing:
+			statusCode = http.StatusNotFound
+		case models.ErrKindInvalid:
+			statusCode = http.StatusBadRequest
+		}
 	}
 
-	writeJSONResponse(statusCode, response, w)
+	writeJSONResponse(statusCode, err, w)
 }
 
 func writeJSONResponse(statusCode int, response interface{}, w http.ResponseWriter) {
-	w.WriteHeader(statusCode)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
 		// Todo(frode): Nothing much to do but log here
