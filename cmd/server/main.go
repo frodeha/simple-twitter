@@ -4,7 +4,9 @@ import (
 	"flag"
 	"log"
 	"os"
+	"simple_twitter/api"
 	"simple_twitter/database"
+	"simple_twitter/twitter"
 
 	ff "github.com/peterbourgon/ff/v3"
 )
@@ -17,6 +19,8 @@ func main() {
 		mysqlUser     = fs.String("mysql-user", "root", "")
 		mysqlPassword = fs.String("mysql-password", "TopSecret", "")
 		mysqlDatabase = fs.String("mysql-database", "simple_twitter", "")
+
+		listenAddr = fs.String("listen-addr", "localhost:3000", "")
 	)
 
 	err := ff.Parse(fs, os.Args[1:], ff.WithEnvVarNoPrefix())
@@ -30,6 +34,12 @@ func main() {
 	}
 	defer conn.Close()
 
-	for {
-	}
+	var (
+		tweetStorage = database.NewTwitterDatabase(conn)
+		twitter      = twitter.NewTwitter(tweetStorage)
+		apiServer    = api.NewServer(*listenAddr, twitter)
+	)
+
+	apiServer.ListenAndServe()
+
 }
