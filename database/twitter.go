@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"simple_twitter/models"
+	"time"
 )
 
 type DB interface {
@@ -53,7 +54,7 @@ func (t TwitterDatabase) GetTweet(ctx context.Context, id int64) (models.Tweet, 
 	)
 
 	if err == sql.ErrNoRows {
-		return models.Tweet{}, models.ErrMissing("found no such tweet")
+		return models.Tweet{}, models.ErrMissingf("found no tweet with id %d", id)
 	}
 
 	if err != nil {
@@ -82,6 +83,50 @@ func (t TwitterDatabase) ListTweets(ctx context.Context, tag string, offset int,
 	}
 
 	return tweets, nil
+}
+
+func (t TwitterDatabase) AggregateTweetsByYear(ctx context.Context, from time.Time, to time.Time) ([]models.YearlyAggregate, error) {
+	var aggregates []models.YearlyAggregate
+	err := t.db.SelectContext(
+		ctx,
+		&aggregates,
+		`
+			SELECT YEAR(created_at) as year, count(id) as tweets
+			FROM Tweets
+			WHERE created_at BETWEEN ? AND ?
+			GROUP BY year
+			ORDER BY year ASC
+		`,
+		from, to,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate tweets: %w", err)
+	}
+
+	return aggregates, nil
+}
+
+func (t TwitterDatabase) AggregateTweetsByMonth(ctx context.Context, from time.Time, to time.Time) ([]models.MonthlyAggregate, error) {
+	var aggregates []models.MonthlyAggregate
+	err := t.db.SelectContext(
+		ctx,
+		&aggregates,
+		`
+			SELECT YEAR(created_at) as year, MONTH(created_at) as month, count(id) as tweets
+			FROM Tweets
+			WHERE created_at BETWEEN ? AND ?
+			GROUP BY year, month
+			ORDER BY year, month ASC
+		`,
+		from, to,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate tweets: %w", err)
+	}
+
+	return aggregates, nil
 }
 
 func NewTwitterDatabase(db DB) TwitterDatabase {

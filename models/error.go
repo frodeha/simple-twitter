@@ -45,15 +45,15 @@ func ErrWithCause(kind ErrorKind, message string, cause error) Error {
 }
 
 func ErrInvalid(message string) Error {
-	return ErrWithCause(ErrKindInternal, message, nil)
+	return ErrWithCause(ErrKindInvalid, message, nil)
 }
 
 func ErrInvalidf(message string, args ...any) Error {
-	return ErrWithCause(ErrKindInternal, fmt.Sprintf(message, args...), nil)
+	return ErrWithCause(ErrKindInvalid, fmt.Sprintf(message, args...), nil)
 }
 
 func ErrInvalidWithCause(message string, cause error) Error {
-	return ErrWithCause(ErrKindInternal, message, cause)
+	return ErrWithCause(ErrKindInvalid, message, cause)
 }
 
 func ErrMissing(message string) Error {

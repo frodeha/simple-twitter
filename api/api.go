@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"simple_twitter/models"
+	"time"
 
 	"strconv"
 )
@@ -12,14 +13,14 @@ import (
 type TwitterService interface {
 	CreateTweet(ctx context.Context, message string, tag string) (models.Tweet, error)
 	ListTweets(ctx context.Context, tag string, offset int, limit int) ([]models.Tweet, error)
+	AggregateTweets(ctx context.Context, from time.Time, to time.Time, groupBy string) (models.AggregatedTweets, error)
 }
 
 func NewServer(addr string, twitter TwitterService) http.Server {
 	var mux http.ServeMux
-
 	mux.HandleFunc("POST /tweets", createTweet(twitter))
 	mux.HandleFunc("GET /tweets", listTweets(twitter))
-
+	mux.HandleFunc("GET /tweets/_aggregate", aggregateTweets(twitter))
 	return http.Server{
 		Addr:    addr,
 		Handler: &mux,
@@ -72,6 +73,42 @@ func listTweets(twitter TwitterService) http.HandlerFunc {
 		}
 
 		tweets, err := twitter.ListTweets(r.Context(), tag, offset, limit)
+		if err != nil {
+			handleError(err, w, r)
+			return
+		}
+
+		writeJSONResponse(http.StatusOK, tweets, w)
+	}
+}
+
+func aggregateTweets(twitter TwitterService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var (
+			groupBy = r.URL.Query().Get("group_by")
+			from    time.Time
+			to      time.Time
+		)
+
+		if r.URL.Query().Has("from") {
+			f, err := time.Parse(time.DateOnly, r.URL.Query().Get("from"))
+			if err != nil {
+				handleError(models.ErrInvalidWithCause("`from` must be a valid date (YYYY-MM-DD)", err), w, r)
+				return
+			}
+			from = f
+		}
+
+		if r.URL.Query().Has("to") {
+			t, err := time.Parse(time.DateOnly, r.URL.Query().Get("to"))
+			if err != nil {
+				handleError(models.ErrInvalidWithCause("`to` must be a valid date (YYYY-MM-DD)", err), w, r)
+				return
+			}
+			to = t
+		}
+
+		tweets, err := twitter.AggregateTweets(r.Context(), from, to, groupBy)
 		if err != nil {
 			handleError(err, w, r)
 			return
