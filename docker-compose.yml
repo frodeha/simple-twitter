@@ -22,3 +22,12 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+
+  seed:
+    image: migrate/migrate
+    volumes:
+        - ./database/seeds:/seeds
+    command: ["-path", "/seeds", "-database", "mysql://root:TopSecret@tcp(mysql:3306)/simple_twitter?x-migrations-table=seed_migrations", "up"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
