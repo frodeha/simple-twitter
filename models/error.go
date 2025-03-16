@@ -30,6 +30,31 @@ func (e ErrorKind) MarshalJSON() ([]byte, error) {
 	return json.Marshal(e.String())
 }
 
+func (e *ErrorKind) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" || string(data) == `""` {
+		return nil
+	}
+
+	var kind string
+	err := json.Unmarshal(data, &kind)
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case kind == ErrKindInvalid.String():
+		*e = ErrKindInvalid
+	case kind == ErrKindMissing.String():
+		*e = ErrKindMissing
+	case kind == ErrKindInternal.String():
+		*e = ErrKindInternal
+	default:
+		return fmt.Errorf("invalid error kind %s", kind)
+	}
+
+	return nil
+}
+
 type Error struct {
 	Kind    ErrorKind `json:"kind"`
 	Message string    `json:"message"`
